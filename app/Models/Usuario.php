@@ -16,7 +16,7 @@ class Usuario extends Authenticatable
 
     protected $hidden = ['pass'];
 
-    // Tu campo de password se llama "pass"
+  
     public function getAuthPassword()
     {
         return $this->pass;
@@ -31,10 +31,10 @@ class Usuario extends Authenticatable
     {
         return $this->belongsToMany(
             \App\Models\Empresa::class,
-            'usuario_empresa',
+            'empresa_usuario',
             'id_usuario',
             'id_empresa'
-        );
+        )->withTimestamps();
     }
 
 }

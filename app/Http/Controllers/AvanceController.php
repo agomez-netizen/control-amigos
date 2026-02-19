@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use App\Models\Avance;
 use App\Models\Empresa;
 use App\Models\AvanceHistorial;
+use App\Models\Usuario;
 
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -40,7 +41,7 @@ class AvanceController extends Controller
     {
         if ($this->isAdmin($u)) return true;
         $userId = (int)($u['id_usuario'] ?? 0);
-        return (int)$avance->user_id === $userId;
+        return (int)$avance->id_usuario === $userId;
     }
 
     private function plainText(?string $html): string
@@ -68,12 +69,13 @@ class AvanceController extends Controller
 
     /**
      * Verifica que una empresa pertenezca al usuario (si no es admin)
+     * Tabla pivote: empresa_usuario
      */
     private function assertEmpresaPermitida(bool $isAdmin, int $userId, ?int $idEmpresa): void
     {
         if ($isAdmin || !$idEmpresa) return;
 
-        $ok = DB::table('usuario_empresa')
+        $ok = DB::table('empresa_usuario')
             ->where('id_usuario', $userId)
             ->where('id_empresa', $idEmpresa)
             ->exists();
@@ -124,16 +126,19 @@ class AvanceController extends Controller
         $descPlano = $this->plainText($data['descripcion']);
 
         DB::transaction(function () use ($idEmpresa, $fecha, $userId, $descPlano) {
+
             $avance = Avance::create([
-                'id_empresa'   => $idEmpresa,
-                'descripcion'  => $descPlano, // ✅ sin HTML
-                'fecha'        => $fecha,
-                'user_id'      => $userId,
+                'id_empresa'  => $idEmpresa,
+                'descripcion' => $descPlano,
+                'fecha'       => $fecha,
+                'id_usuario'  => $userId, // ✅
             ]);
 
+            // ✅ Tu tabla avance_historial exige user_id (NOT NULL)
             AvanceHistorial::create([
                 'id_avance'      => (int)$avance->id_avance,
-                'user_id'        => $userId,
+                'user_id'        => $userId, // ✅ requerido por tu tabla historial
+                'id_usuario'     => $userId, // ✅ por compatibilidad si existe
                 'campo'          => 'CREADO',
                 'valor_anterior' => null,
                 'valor_nuevo'    => 'Avance creado',
@@ -155,28 +160,44 @@ class AvanceController extends Controller
         $userId  = (int)($u['id_usuario'] ?? 0);
         $isAdmin = $this->isAdmin($u);
 
-        // ✅ Empresas del combo: admin todas, usuario solo asignadas (pivote)
         $empresas = $this->empresasVisibles($userId, $isAdmin);
 
         $idEmpresa   = $request->input('id_empresa');
         $empresaTxt  = trim((string)$request->input('empresa'));
+        $idUsuario   = $request->input('id_usuario');
         $desde       = $request->input('desde');
         $hasta       = $request->input('hasta');
 
         $idEmpresaInt = $idEmpresa ? (int)$idEmpresa : null;
+        $idUsuarioInt = $idUsuario ? (int)$idUsuario : null;
 
-        // ✅ Si selecciona empresa por ID y no es admin, validar que sea suya
+        // ✅ No admin: si selecciona empresa por ID, debe ser suya
         $this->assertEmpresaPermitida($isAdmin, $userId, $idEmpresaInt);
+
+        // ✅ Combo usuarios:
+        // Admin: todos
+        // No admin: solo él mismo (para no elegir a otros)
+        $usuarios = $isAdmin
+            ? Usuario::orderBy('nombre')->orderBy('apellido')->get()
+            : Usuario::where('id_usuario', $userId)->get();
 
         $q = Avance::query()
             ->with(['empresa', 'usuario'])
-            ->when(!$isAdmin, function ($qq) use ($userId) {
-                $qq->whereHas('empresa.usuarios', fn ($q2) => $q2->where('usuarios.id_usuario', $userId));
-            })
+
+            // ✅ REGLA PRINCIPAL:
+            // - Admin ve todo
+            // - No admin SOLO sus avances
+            ->when(!$isAdmin, fn ($qq) => $qq->where('id_usuario', $userId))
+
+            // filtros normales
             ->when($idEmpresaInt, fn ($qq) => $qq->where('id_empresa', $idEmpresaInt))
             ->when(!$idEmpresaInt && $empresaTxt !== '', function ($qq) use ($empresaTxt) {
                 $qq->whereHas('empresa', fn ($e) => $e->where('nombre', 'like', "%{$empresaTxt}%"));
             })
+
+            // ✅ Admin puede filtrar por usuario; no-admin IGNORA este filtro
+            ->when($isAdmin && $idUsuarioInt, fn ($qq) => $qq->where('id_usuario', $idUsuarioInt))
+
             ->when($desde, fn ($qq) => $qq->whereDate('fecha', '>=', $desde))
             ->when($hasta, fn ($qq) => $qq->whereDate('fecha', '<=', $hasta))
             ->orderBy('fecha', 'desc')
@@ -191,9 +212,11 @@ class AvanceController extends Controller
 
         return view('avances.by_date', compact(
             'empresas',
+            'usuarios',
             'grouped',
             'idEmpresa',
             'empresaTxt',
+            'idUsuario',
             'empresaSeleccionadaNombre',
             'desde',
             'hasta'
@@ -202,7 +225,7 @@ class AvanceController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Update (editar + bitácora) -> SIN HTML + empresa por NOMBRE en bitácora
+    | Update (editar + bitácora) -> SIN HTML
     |--------------------------------------------------------------------------
     */
     public function update(Request $request, $id)
@@ -235,7 +258,6 @@ class AvanceController extends Controller
         $oldDescPlain = $this->plainText($avance->descripcion);
         $newDescPlain = $this->plainText($data['descripcion']);
 
-        // ✅ Nombres correctos: empresa, no "proyecto"
         $oldEmpresaNombre = $avance->empresa->nombre ?? ('ID ' . $avance->id_empresa);
         $newEmpresaNombre = Empresa::where('id_empresa', $idEmpresaNueva)->value('nombre')
             ?? ('ID ' . $idEmpresaNueva);
@@ -243,41 +265,28 @@ class AvanceController extends Controller
         $cambios = [];
 
         if ((int)$avance->id_empresa !== $idEmpresaNueva) {
-            $cambios[] = [
-                'campo' => 'empresa',
-                'old'   => $oldEmpresaNombre,
-                'new'   => $newEmpresaNombre,
-            ];
+            $cambios[] = ['campo' => 'empresa', 'old' => $oldEmpresaNombre, 'new' => $newEmpresaNombre];
         }
-
         if ($oldDescPlain !== $newDescPlain) {
-            $cambios[] = [
-                'campo' => 'descripcion',
-                'old'   => $oldDescPlain,
-                'new'   => $newDescPlain,
-            ];
+            $cambios[] = ['campo' => 'descripcion', 'old' => $oldDescPlain, 'new' => $newDescPlain];
         }
-
         if ((string)$avance->fecha !== (string)$nuevaFecha) {
-            $cambios[] = [
-                'campo' => 'fecha',
-                'old'   => (string)$avance->fecha,
-                'new'   => (string)$nuevaFecha,
-            ];
+            $cambios[] = ['campo' => 'fecha', 'old' => (string)$avance->fecha, 'new' => (string)$nuevaFecha];
         }
 
         DB::transaction(function () use ($avance, $idEmpresaNueva, $nuevaFecha, $cambios, $userId, $newDescPlain) {
 
             $avance->update([
                 'id_empresa'  => $idEmpresaNueva,
-                'descripcion' => $newDescPlain, // ✅ sin HTML
+                'descripcion' => $newDescPlain,
                 'fecha'       => $nuevaFecha,
             ]);
 
             foreach ($cambios as $c) {
                 AvanceHistorial::create([
                     'id_avance'      => (int)$avance->id_avance,
-                    'user_id'        => $userId,
+                    'user_id'        => $userId,   // ✅ requerido por tu tabla historial
+                    'id_usuario'     => $userId,   // ✅ por compatibilidad si existe
                     'campo'          => $c['campo'],
                     'valor_anterior' => $c['old'],
                     'valor_nuevo'    => $c['new'],
@@ -309,7 +318,7 @@ class AvanceController extends Controller
             abort(403, 'No tienes permiso.');
         }
 
-        // ✅ además: si no es admin, el avance debe pertenecer a una empresa asignada
+        // ✅ No admin: además la empresa debe ser asignada (tu regla actual)
         if (!$isAdmin) {
             $this->assertEmpresaPermitida(false, $userId, (int)$avance->id_empresa);
         }
@@ -345,7 +354,7 @@ class AvanceController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Dashboard de avances (respetando permisos)
+    | Dashboard de avances (REGLA: no-admin solo sus avances)
     |--------------------------------------------------------------------------
     */
     public function dashboard(Request $request)
@@ -359,10 +368,8 @@ class AvanceController extends Controller
 
         $rows = DB::table('avances as a')
             ->join('empresa as e', 'e.id_empresa', '=', 'a.id_empresa')
-            ->when(!$isAdmin, function ($q) use ($userId) {
-                $q->join('usuario_empresa as ue', 'ue.id_empresa', '=', 'e.id_empresa')
-                  ->where('ue.id_usuario', $userId);
-            })
+            // ✅ No admin: solo sus avances
+            ->when(!$isAdmin, fn ($q) => $q->where('a.id_usuario', $userId))
             ->when($desde, fn($q) => $q->whereDate('a.fecha', '>=', $desde))
             ->when($hasta, fn($q) => $q->whereDate('a.fecha', '<=', $hasta))
             ->select('e.nombre', DB::raw('COUNT(*) as total'))
@@ -388,7 +395,7 @@ class AvanceController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Export Excel (respetando permisos)
+    | Export Excel (REGLA: no-admin solo sus avances)
     |--------------------------------------------------------------------------
     */
     public function exportExcel(Request $request)
@@ -400,15 +407,20 @@ class AvanceController extends Controller
         $desde     = $request->input('desde');
         $hasta     = $request->input('hasta');
         $idEmpresa = $request->input('id_empresa');
+        $idUsuario = $request->input('id_usuario');
+
         $idEmpresaInt = $idEmpresa ? (int)$idEmpresa : null;
+        $idUsuarioInt = $idUsuario ? (int)$idUsuario : null;
 
         $this->assertEmpresaPermitida($isAdmin, $userId, $idEmpresaInt);
 
         $avances = Avance::with(['empresa', 'usuario'])
-            ->when(!$isAdmin, function ($q) use ($userId) {
-                $q->whereHas('empresa.usuarios', fn($qq) => $qq->where('usuarios.id_usuario', $userId));
-            })
+            // ✅ No admin: solo sus avances
+            ->when(!$isAdmin, fn ($q) => $q->where('id_usuario', $userId))
+            // filtros
             ->when($idEmpresaInt, fn($q) => $q->where('id_empresa', $idEmpresaInt))
+            // ✅ Admin puede filtrar por usuario; no-admin ignora
+            ->when($isAdmin && $idUsuarioInt, fn ($q) => $q->where('id_usuario', $idUsuarioInt))
             ->when($desde, fn($q) => $q->whereDate('fecha', '>=', $desde))
             ->when($hasta, fn($q) => $q->whereDate('fecha', '<=', $hasta))
             ->orderBy('fecha', 'desc')
@@ -430,7 +442,7 @@ class AvanceController extends Controller
                 $a->empresa->nombre ?? '—',
                 $this->plainText($a->descripcion),
                 $a->usuario->nombre ?? 'Usuario eliminado',
-                $a->usuario->apellido ?? 'Usuario eliminado',
+                $a->usuario->apellido ?? '',
                 $a->created_at ? $a->created_at->format('H:i') : '',
             ];
         }
@@ -440,7 +452,7 @@ class AvanceController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Export PDF (respetando permisos + empresas visibles)
+    | Export PDF (REGLA: no-admin solo sus avances)
     |--------------------------------------------------------------------------
     */
     public function exportPdf(Request $request)
@@ -449,24 +461,28 @@ class AvanceController extends Controller
         $userId  = (int)($u['id_usuario'] ?? 0);
         $isAdmin = $this->isAdmin($u);
 
-        // ✅ Lista de empresas para el filtro/encabezado del PDF (según permisos)
         $empresas = $this->empresasVisibles($userId, $isAdmin);
 
         $idEmpresa = $request->input('id_empresa');
+        $idUsuario = $request->input('id_usuario');
         $desde     = $request->input('desde');
         $hasta     = $request->input('hasta');
 
         $idEmpresaInt = $idEmpresa ? (int)$idEmpresa : null;
+        $idUsuarioInt = $idUsuario ? (int)$idUsuario : null;
+
         $this->assertEmpresaPermitida($isAdmin, $userId, $idEmpresaInt);
 
         $avances = Avance::query()
             ->with(['empresa', 'usuario'])
-            ->when(!$isAdmin, function ($q) use ($userId) {
-                $q->whereHas('empresa.usuarios', fn($qq) => $qq->where('usuarios.id_usuario', $userId));
-            })
-            ->when($idEmpresaInt, fn($qq) => $qq->where('id_empresa', $idEmpresaInt))
-            ->when($desde, fn($qq) => $qq->whereDate('fecha', '>=', $desde))
-            ->when($hasta, fn($qq) => $qq->whereDate('fecha', '<=', $hasta))
+            // ✅ No admin: solo sus avances
+            ->when(!$isAdmin, fn ($q) => $q->where('id_usuario', $userId))
+            // filtros
+            ->when($idEmpresaInt, fn ($qq) => $qq->where('id_empresa', $idEmpresaInt))
+            // ✅ Admin puede filtrar por usuario; no-admin ignora
+            ->when($isAdmin && $idUsuarioInt, fn ($qq) => $qq->where('id_usuario', $idUsuarioInt))
+            ->when($desde, fn ($qq) => $qq->whereDate('fecha', '>=', $desde))
+            ->when($hasta, fn ($qq) => $qq->whereDate('fecha', '<=', $hasta))
             ->orderBy('fecha', 'desc')
             ->orderBy('created_at', 'desc')
             ->get();

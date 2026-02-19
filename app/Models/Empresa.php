@@ -39,4 +39,13 @@ class Empresa extends Model
     public function tipoEmpresa() { return $this->belongsTo(TipoEmpresa::class, 'id_tipo_empresa', 'id_tipo_empresa'); }
     public function contactos() { return $this->hasMany(Contacto::class, 'id_empresa', 'id_empresa'); }
 
+    public function usuarios()
+    {
+        return $this->belongsToMany(
+            \App\Models\Usuario::class,
+            'empresa_usuario',
+            'id_empresa',
+            'id_usuario'
+        )->withTimestamps();
+    }
 }

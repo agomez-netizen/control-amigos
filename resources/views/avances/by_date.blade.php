@@ -20,41 +20,62 @@
     </div>
   </div>
 
-  <form class="card card-body mb-3" method="GET" action="{{ route('avances.byDate') }}">
-    <div class="row g-3 align-items-end">
+ <form class="card card-body mb-3" method="GET" action="{{ route('avances.byDate') }}">
+  <div class="row g-3 align-items-end">
 
-      <div class="col-md-6">
-        <label class="form-label">Punto de Venta</label>
-
-        <select id="empresaSelect" name="id_empresa" class="form-select">
-          <option value="" {{ empty($idEmpresa) ? 'selected' : '' }}>— Todos —</option>
-
-          @foreach($empresas as $e)
-            <option value="{{ $e->id_empresa }}" {{ (string)$idEmpresa === (string)$e->id_empresa ? 'selected' : '' }}>
-              {{ $e->nombre }}
-            </option>
-          @endforeach
-        </select>
-
-        <div class="form-text">Escribe para buscar y selecciona una empresa.</div>
-      </div>
-
-      <div class="col-md-3">
-        <label class="form-label">Desde</label>
-        <input class="form-control" type="date" name="desde" value="{{ $desde }}">
-      </div>
-
-      <div class="col-md-3">
-        <label class="form-label">Hasta</label>
-        <input class="form-control" type="date" name="hasta" value="{{ $hasta }}">
-      </div>
-
-      <div class="col-md-12 d-grid">
-        <button class="btn btn-primary" type="submit">Filtrar</button>
-      </div>
-
+    {{-- Fila 1 --}}
+    <div class="col-md-6">
+      <label class="form-label">Punto de Venta</label>
+      <select id="empresaSelect" name="id_empresa" class="form-select">
+        <option value="" {{ empty($idEmpresa) ? 'selected' : '' }}>— Todos —</option>
+        @foreach($empresas as $e)
+          <option value="{{ $e->id_empresa }}"
+            {{ (string)$idEmpresa === (string)$e->id_empresa ? 'selected' : '' }}>
+            {{ $e->nombre }}
+          </option>
+        @endforeach
+      </select>
+      <div class="form-text">Escribe para buscar y selecciona una empresa.</div>
     </div>
-  </form>
+
+    <div class="col-md-6">
+      <label class="form-label">Usuario</label>
+      <select id="usuarioSelect" name="id_usuario" class="form-select">
+        <option value="">— Todos —</option>
+        @foreach(($usuarios ?? collect()) as $usuario)
+          <option value="{{ $usuario->id_usuario }}"
+            {{ (string)request('id_usuario') === (string)$usuario->id_usuario ? 'selected' : '' }}>
+            {{ $usuario->nombre }} {{ $usuario->apellido }}
+          </option>
+        @endforeach
+      </select>
+      <div class="form-text">Escribe para buscar y selecciona un usuario.</div>
+    </div>
+
+    {{-- Fila 2 --}}
+    <div class="col-md-4">
+      <label class="form-label">Desde</label>
+      <input class="form-control" type="date"
+             name="desde"
+             value="{{ request('desde', $desde ?? '') }}">
+    </div>
+
+    <div class="col-md-4">
+      <label class="form-label">Hasta</label>
+      <input class="form-control" type="date"
+             name="hasta"
+             value="{{ request('hasta', $hasta ?? '') }}">
+    </div>
+
+    <div class="col-md-4 text-end">
+      <label class="form-label d-block invisible">Botón</label>
+      <button class="btn btn-primary w-100" type="submit">
+        Filtrar
+      </button>
+    </div>
+
+  </div>
+</form>
 
   @forelse($grouped as $fecha => $items)
     <div class="mb-2">
@@ -125,9 +146,24 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   // Tom Select (si está disponible)
-  const sel = document.getElementById('empresaSelect');
-  if (sel && window.TomSelect) {
-    new TomSelect(sel, {
+  const empresaSel = document.getElementById('empresaSelect');
+  if (empresaSel && window.TomSelect) {
+    new TomSelect(empresaSel, {
+      create: false,
+      allowEmptyOption: true,
+      placeholder: '— Todos —',
+      maxOptions: 5000,
+      render: {
+        no_results: function() {
+          return '<div class="no-results">No hay resultados</div>';
+        }
+      }
+    });
+  }
+
+  const usuarioSel = document.getElementById('usuarioSelect');
+  if (usuarioSel && window.TomSelect) {
+    new TomSelect(usuarioSel, {
       create: false,
       allowEmptyOption: true,
       placeholder: '— Todos —',

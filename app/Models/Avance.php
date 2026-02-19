@@ -11,9 +11,9 @@ class Avance extends Model
 
     protected $fillable = [
         'id_empresa',
+        'id_usuario',
         'descripcion',
         'fecha',
-        'user_id',
     ];
 
     public function empresa()
@@ -29,7 +29,7 @@ class Avance extends Model
 
     public function usuario()
     {
-        return $this->belongsTo(Usuario::class, 'user_id', 'id_usuario');
+        return $this->belongsTo(Usuario::class, 'id_usuario', 'id_usuario');
     }
 
     public function historial()
