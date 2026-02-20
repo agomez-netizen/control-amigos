@@ -98,6 +98,8 @@ Route::post('/empresas/import', [EmpresaController::class, 'importExcel'])
     // CRUD completo
     Route::resource('empresas', EmpresaController::class);
 
+    Route::get('/avances/exportar', [AvanceController::class, 'exportByDate'])
+    ->name('avances.export');
 
     // =========================
     // VENTAS

@@ -10,9 +10,8 @@ use App\Models\Avance;
 use App\Models\Empresa;
 use App\Models\AvanceHistorial;
 use App\Models\Usuario;
-
 use Maatwebsite\Excel\Facades\Excel;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exports\ArrayExport;
 
 class AvanceController extends Controller
 {
@@ -495,4 +494,53 @@ class AvanceController extends Controller
 
         return $pdf->download('avances.pdf');
     }
+
+    public function exportByDate(Request $request)
+{
+    $query = Avance::with(['empresa', 'usuario']);
+
+    // Filtros opcionales
+    if ($request->filled('id_empresa')) {
+        $query->where('id_empresa', $request->id_empresa);
+    }
+
+    if ($request->filled('id_usuario')) {
+        $query->where('id_usuario', $request->id_usuario);
+    }
+
+    if ($request->filled('desde')) {
+        $query->whereDate('fecha', '>=', $request->desde);
+    }
+
+    if ($request->filled('hasta')) {
+        $query->whereDate('fecha', '<=', $request->hasta);
+    }
+
+    $avances = $query->orderBy('fecha', 'desc')->get();
+
+    // Construcción del array para Excel
+    $data = [];
+
+    // Encabezados
+    $data[] = [
+        'Fecha',
+        'Empresa',
+        'Usuario',
+        'Descripción'
+    ];
+
+    foreach ($avances as $avance) {
+        $data[] = [
+            $avance->fecha,
+            $avance->empresa->nombre ?? '',
+            ($avance->usuario->nombre ?? '') . ' ' . ($avance->usuario->apellido ?? ''),
+            strip_tags($avance->descripcion)
+        ];
+    }
+
+    return Excel::download(
+        new ArrayExport($data),
+        'avances.xlsx'
+    );
+}
 }

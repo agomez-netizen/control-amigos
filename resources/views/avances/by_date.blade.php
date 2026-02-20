@@ -14,7 +14,11 @@
     <h3 class="mb-0">Avances por fecha</h3>
 
     <div class="d-flex gap-2">
-      <a href="{{ route('avances.create') }}" class="btn btn-outline-primary">
+      <a href="{{ route('avances.export', request()->all()) }}"
+        class="btn btn-success">
+            Exportar Excel
+        </a>
+        <a href="{{ route('avances.create') }}" class="btn btn-outline-primary">
         Registrar avance
       </a>
     </div>
