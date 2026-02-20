@@ -69,7 +69,7 @@ class EmpresaController extends Controller
             });
         }
 
-        $empresas = $empresasQuery->orderBy('nombre')->paginate(20)->withQueryString();
+        $empresas = $empresasQuery->orderBy('nombre')->paginate(5)->withQueryString();
 
         $bases = BaseDeDatos::orderBy('nombre')->get();
         $tipos = TipoEmpresa::orderBy('nombre')->get();
@@ -503,4 +503,7 @@ public function store(Request $request)
             ->with('success', $msg)
             ->with('errors_import', $errors);
     }
+
+
+
 }
