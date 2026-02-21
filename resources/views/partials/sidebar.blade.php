@@ -34,7 +34,7 @@
 
 
   {{-- ================= AVANCES ================= --}}
-  @if($canAvances)
+ {{--  @if($canAvances)
     <button type="button"
             class="navitem btn-reset {{ $avOpen ? 'active' : '' }}"
             data-bs-toggle="collapse"
@@ -75,7 +75,7 @@
       </div>
     </div>
   @endif
-
+--}}
 
   {{-- ================= EMPRESAS ================= --}}
   @if($canEmpresas)
@@ -98,15 +98,15 @@
            class="navitem {{ request()->routeIs('empresas.index') ? 'active' : '' }}"
            title="Listado de empresas">
           <span class="navicon">📋</span>
-          <span>Listado</span>
+          <span>Directorio</span>
         </a>
 
-        <a href="{{ route('empresas.create') }}"
+      {{--  <a href="{{ route('empresas.create') }}"
            class="navitem {{ request()->routeIs('empresas.create') ? 'active' : '' }}"
            title="Crear empresa">
           <span class="navicon">➕</span>
           <span>Nueva</span>
-        </a>
+        </a>--}}
 
       </div>
     </div>
@@ -128,7 +128,7 @@
 </div>
 
 <div class="sidebar-footer text-center text-white-50 small py-3 border-top mt-auto">
-  © {{ date('Y') }} Seguimiento de Ventas
+  © {{ date('Y') }} AAPOS 2026
   <div class="opacity-75">
     Ingeniería que impulsa resultados.
     Arquitectura & Desarrollo <br> Ing. Aníbal Gómez

@@ -9,7 +9,7 @@
       <div class="card-body p-4 p-md-5">
 
         <div class="card-logo">
-          <img src="{{ asset('img/logo_apos.png') }}" alt="AA POS">
+          <img src="{{ asset('img/logo_aapos.png') }}" alt="AA POS">
         </div>
 
         <h1 class="h3 mb-1 fw-bold text-center">Iniciar sesión</h1>
@@ -45,7 +45,7 @@
 
     <div class="foot">
       <div class="sidebar-footer text-center text-white-50 small py-3 border-top mt-auto">
-        © {{ date('Y') }} Seguimiento de Ventas
+        © {{ date('Y') }} AAPOS 2026
         <div class="opacity-75">
             Ingeniería que impulsa resultados.
             Arquitectura & Desarrollo <br> Ing. Aníbal Gómez <br>

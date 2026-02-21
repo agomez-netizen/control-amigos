@@ -39,7 +39,10 @@
 
     <div class="d-flex gap-2">
       <a href="{{ route('empresas.create') }}" class="btn btn-outline-primary">Nueva</a>
-      <a href="{{ route('empresas.importForm') }}" class="btn btn-outline-dark">Importar Excel</a>
+      <a class="btn btn-success"
+        href="{{ route('empresas.export.excel', request()->query()) }}">
+        Exportar Excel
+        </a>
     </div>
   </div>
 

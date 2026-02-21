@@ -82,13 +82,12 @@ Route::middleware(['auth.custom', 'nocache'])->group(function () {
         ->name('empresa.alias');
 
     // Exportaciones
-    Route::get('/empresas/export', [EmpresaController::class, 'exportExcel'])
-        ->name('empresas.export');
 
-    Route::get('/empresas/export-descripcion', [EmpresaController::class, 'exportExcelDescripcion'])
-        ->name('empresas.exportDescripcion');
+    Route::get('empresas/export/excel', [EmpresaController::class, 'exportEmpresasExcel'])
+    ->name('empresas.export.excel');
 
-
+    Route::get('empresas/{empresa}/contactos/export/excel', [EmpresaController::class, 'exportContactosExcel'])
+    ->name('empresas.contactos.export.excel');
 
         Route::get('/empresas/import', [EmpresaController::class, 'importForm'])
     ->name('empresas.importForm');
@@ -100,6 +99,15 @@ Route::post('/empresas/import', [EmpresaController::class, 'importExcel'])
 
     Route::get('/avances/exportar', [AvanceController::class, 'exportByDate'])
     ->name('avances.export');
+
+    Route::post('empresas/{empresa}/contactos', [EmpresaController::class, 'contactoStore'])
+  ->name('empresas.contactos.store');
+
+    Route::put('empresas/{empresa}/contactos/{contacto}', [EmpresaController::class, 'contactoUpdate'])
+    ->name('empresas.contactos.update');
+
+    Route::delete('empresas/{empresa}/contactos/{contacto}', [EmpresaController::class, 'contactoDestroy'])
+    ->name('empresas.contactos.destroy');
 
     // =========================
     // VENTAS

@@ -54,7 +54,7 @@
       ☰
     </button>
 
-    <span class="navbar-brand ms-2">SEGUIMIENTO DE VENTA RIFA 2026</span>
+    <span class="navbar-brand ms-2">OFICINA AMIGOS PRO OBRAS</span>
 
     {{-- Usuario --}}
     <div class="ms-auto d-flex align-items-center gap-2 userbox">
