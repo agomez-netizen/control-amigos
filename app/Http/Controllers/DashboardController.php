@@ -15,4 +15,12 @@ class DashboardController extends Controller
     {
         return view('dashboard.scatter');
     }
+
+    public function public()
+{
+    // Si NO necesitas datos aún, quita la línea $data y compact
+    // $data = $this->getDashboardData();
+
+    return view('dashboard.public');
+}
 }

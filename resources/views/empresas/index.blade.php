@@ -155,7 +155,7 @@
               <a href="{{ route('empresas.edit', $e->id_empresa) }}"
                  class="btn btn-sm btn-outline-primary"
                  data-no-rowclick="1">
-                 Editar
+                 ✏️
               </a>
 
               <form action="{{ route('empresas.destroy', $e->id_empresa) }}"
@@ -166,7 +166,7 @@
                 @csrf
                 @method('DELETE')
                 <button class="btn btn-sm btn-outline-danger">
-                  Eliminar
+                  🗑️
                 </button>
               </form>
             </td>

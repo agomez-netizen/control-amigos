@@ -183,7 +183,7 @@
                 <td class="text-end">
                   <a class="btn btn-sm btn-outline-primary"
                      href="{{ route('empresas.edit', [$empresa->id_empresa, 'edit_contacto' => $c->id_contacto]) }}">
-                    Editar
+                    ✏️
                   </a>
 
                   <form method="POST"
@@ -192,7 +192,7 @@
                         onsubmit="return confirm('¿Eliminar este contacto?')">
                     @csrf
                     @method('DELETE')
-                    <button class="btn btn-sm btn-outline-danger">Eliminar</button>
+                    <button class="btn btn-sm btn-outline-danger">🗑️</button>
                   </form>
                 </td>
               </tr>

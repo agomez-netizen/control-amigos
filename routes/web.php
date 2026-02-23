@@ -128,3 +128,12 @@ Route::post('/empresas/import', [EmpresaController::class, 'importExcel'])
 
 
 });
+
+/*
+|--------------------------------------------------------------------------
+| DASHBOARD PÚBLICO (sin login)
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/public/dashboard', [DashboardController::class, 'public'])
+    ->name('dashboard.public');
