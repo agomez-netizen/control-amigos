@@ -9,7 +9,7 @@
       <div class="card-body p-4 p-md-5">
 
         <div class="card-logo">
-          <img src="{{ asset('img/logo_aapos.png') }}" alt="AA POS">
+          <img src="{{ asset('img/oficina.png') }}" alt="AA POS">
         </div>
 
         <h1 class="h3 mb-1 fw-bold text-center">Iniciar sesión</h1>
