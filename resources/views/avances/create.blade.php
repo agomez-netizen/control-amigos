@@ -39,17 +39,65 @@
         @csrf
 
         <div class="mb-3">
-          <label class="form-label">Punto de Venta</label>
-          <select name="id_empresa" class="form-select" required>
+          <label class="form-label">Contacto</label>
+
+          <select name="id_contacto" class="form-select" required>
             <option value="">— Seleccionar —</option>
-            @foreach ($empresas as $p)
-              <option value="{{ $p->id_empresa }}"
-                {{ old('id_empresa') == $p->id_empresa ? 'selected' : '' }}>
-                {{ $p->nombre }}
-              </option>
+
+            @foreach ($contactos as $c)
+            <option
+                value="{{ $c->id_contacto }}"
+                {{ old('id_contacto') == $c->id_contacto ? 'selected' : '' }}
+                data-empresa="{{ e($c->empresa_nombre ?? '') }}"
+                data-nombre="{{ e(trim(($c->contacto_nombre ?? '').' '.($c->contacto_apellido ?? ''))) }}"
+                data-puesto="{{ e($c->puesto ?? '') }}"
+                data-telefono="{{ e($c->telefono ?? '') }}"
+                data-celular="{{ e($c->celular ?? '') }}"
+                data-email="{{ e($c->email ?? '') }}"
+            >
+                {{ $c->empresa_nombre }}
+                — {{ $c->contacto_nombre }} {{ $c->contacto_apellido ?? '' }}
+                @if(!empty($c->puesto)) ({{ $c->puesto }}) @endif
+            </option>
             @endforeach
           </select>
+
+          <small class="text-muted">
+            Solo verás contactos de empresas cuya base de datos está asignada a tu usuario.
+          </small>
         </div>
+        <div id="contacto-card" class="border rounded p-3 mt-2 d-none">
+  <div class="fw-semibold mb-2">Datos del contacto</div>
+
+  <div class="row g-2 small">
+    <div class="col-md-6">
+      <div class="text-muted">Empresa</div>
+      <div id="c-empresa" class="fw-semibold">—</div>
+    </div>
+    <div class="col-md-6">
+      <div class="text-muted">Nombre</div>
+      <div id="c-nombre" class="fw-semibold">—</div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="text-muted">Puesto</div>
+      <div id="c-puesto">—</div>
+    </div>
+    <div class="col-md-6">
+      <div class="text-muted">Email</div>
+      <div id="c-email">—</div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="text-muted">Teléfono</div>
+      <div id="c-telefono">—</div>
+    </div>
+    <div class="col-md-6">
+      <div class="text-muted">Celular</div>
+      <div id="c-celular">—</div>
+    </div>
+  </div>
+</div>
 
         <div class="mb-3">
           <label class="form-label">Descripción</label>
@@ -126,7 +174,12 @@ document.addEventListener('DOMContentLoaded', function () {
       tinymce.triggerSave();
     } else {
       // Fallback sin TinyMCE
-      plainText = (textarea.value || '').trim().replace(/<[^>]*>/g, '').replace(/&nbsp;/g,' ').trim();
+      plainText = (textarea.value || '')
+        .trim()
+        .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/g,' ')
+        .trim();
+
       if (!plainText) {
         e.preventDefault();
         descError.classList.remove('d-none');
@@ -142,5 +195,52 @@ document.addEventListener('DOMContentLoaded', function () {
     btn.innerText = 'Guardando...';
   });
 });
+
+  const selectContacto = document.querySelector('select[name="id_contacto"]');
+  const card = document.getElementById('contacto-card');
+
+  const elEmpresa  = document.getElementById('c-empresa');
+  const elNombre   = document.getElementById('c-nombre');
+  const elPuesto   = document.getElementById('c-puesto');
+  const elEmail    = document.getElementById('c-email');
+  const elTel      = document.getElementById('c-telefono');
+  const elCel      = document.getElementById('c-celular');
+
+  function setText(el, val) {
+    el.textContent = (val && String(val).trim()) ? val : '—';
+  }
+
+  function renderContacto() {
+    const opt = selectContacto?.selectedOptions?.[0];
+    const id = opt?.value;
+
+    if (!opt || !id) {
+      card.classList.add('d-none');
+      return;
+    }
+
+    setText(elEmpresa,  opt.dataset.empresa);
+    setText(elNombre,   opt.dataset.nombre);
+    setText(elPuesto,   opt.dataset.puesto);
+
+    // Email como link si existe
+    const email = (opt.dataset.email || '').trim();
+    if (email) {
+      elEmail.innerHTML = `<a href="mailto:${email}">${email}</a>`;
+    } else {
+      elEmail.textContent = '—';
+    }
+
+    setText(elTel,  opt.dataset.telefono);
+    setText(elCel,  opt.dataset.celular);
+
+    card.classList.remove('d-none');
+  }
+
+  if (selectContacto) {
+    selectContacto.addEventListener('change', renderContacto);
+    // pinta si ya viene seleccionado (old())
+    renderContacto();
+  }
 </script>
 @endpush

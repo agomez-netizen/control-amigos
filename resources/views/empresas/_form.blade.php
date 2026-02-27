@@ -40,6 +40,7 @@
           'titulo'        => $c->titulo,
           'notas'         => $c->notas,
           'activo'        => $c->activo,
+
         ];
       })->toArray() ?? [];
     }
@@ -94,7 +95,7 @@
             </select>
           </div>
 
-          <div class="col-md-2">
+          <div class="col-md-1">
             <label class="form-label d-block">Activo</label>
             <div class="form-check mt-2">
               <input class="form-check-input" type="checkbox" name="activo" id="activo"
@@ -102,6 +103,17 @@
               <label class="form-check-label" for="activo">Sí</label>
             </div>
           </div>
+
+          <div class="col-md-1">
+              <label class="form-label d-block" for="proyectos">Proyectos</label>
+            <input class="form-check-input"
+                type="checkbox"
+                name="proyectos"
+                id="proyectos"
+                value="1"
+                @checked(old('proyectos', $empresa->proyectos ?? 0))>
+                <label class="form-check-label" for="activo">Sí</label>
+        </div>
 
           <div class="col-md-4">
             <label class="form-label">Tipo de empresa</label>

@@ -34,7 +34,7 @@
 
 
   {{-- ================= AVANCES ================= --}}
- {{--  @if($canAvances)
+   {{-- @if($canAvances)
     <button type="button"
             class="navitem btn-reset {{ $avOpen ? 'active' : '' }}"
             data-bs-toggle="collapse"

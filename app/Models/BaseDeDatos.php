@@ -20,4 +20,15 @@ class BaseDeDatos extends Model
     {
         return $this->hasMany(Empresa::class, 'id_base_datos', 'id_base_datos');
     }
+
+    public function usuarios()
+    {
+        return $this->belongsToMany(
+            \App\Models\Usuario::class,
+            'usuario_base_datos',
+            'id_base_datos',
+            'id_usuario'
+        );
+    }
+
 }

@@ -72,7 +72,7 @@ class EmpresaController extends Controller
             });
         }
 
-        $empresas = $empresasQuery->orderBy('nombre')->paginate(5)->withQueryString();
+        $empresas = $empresasQuery->orderBy('nombre')->paginate(7)->withQueryString();
 
         $bases = BaseDeDatos::orderBy('nombre')->get();
         $tipos = TipoEmpresa::orderBy('nombre')->get();
@@ -110,6 +110,7 @@ public function store(Request $request)
         'sitio_web' => ['nullable', 'string', 'max:180'],
         'detalles' => ['nullable', 'string'],
         'notas' => ['nullable', 'string'],
+        'proyectos' => ['nullable', 'boolean'],
 
         // Contactos (repetible)
         'contactos' => ['nullable', 'array'],
@@ -128,6 +129,7 @@ public function store(Request $request)
 
     // Normaliza activo (si no viene el checkbox => false)
     $data['activo'] = $request->boolean('activo');
+    $data['proyectos'] = $request->boolean('proyectos');
 
     // Fuerza gestor_aapos (Nombre Apellido del usuario logueado)
     $user = session('user');
@@ -271,9 +273,11 @@ public function update(Request $request, $id)
         'detalles' => ['nullable','string'],
         'notas' => ['nullable','string'],
         'gestor_aapos' => ['nullable','string','max:120'],
+        'proyectos' => ['nullable', 'boolean'],
     ]);
 
     $data['activo'] = $request->boolean('activo');
+     $data['proyectos'] = $request->boolean('proyectos');
 
     $empresa->update($data);
 
@@ -407,6 +411,7 @@ public function update(Request $request, $id)
                         'gestor_aapos' => $row['gestor_aapos'] ?? null,
                         'id_base_datos' => (int)$base->id_base_datos,
                         'id_tipo_empresa' => $tipo ? (int)$tipo->id_tipo_empresa : null,
+                        'proyectos'=> isset($row['proyectos']) ? (int) !!$row['proyectos'] : 1,
                     ];
 
                     $empresa = Empresa::firstOrCreate(['nombre' => $nombre], $payload);
@@ -585,6 +590,7 @@ public function exportEmpresasExcel(Request $request)
     $pais   = trim((string) $request->get('pais', ''));
     $depto  = trim((string) $request->get('departamento', ''));
     $muni   = trim((string) $request->get('municipio', ''));
+    $proyeectos   = trim((string) $request->get('proyectos', ''));
 
     $query = Empresa::query()
         ->with(['baseDeDatos', 'tipoEmpresa'])   // ajusta nombres si difieren
@@ -623,7 +629,7 @@ public function exportEmpresasExcel(Request $request)
     // Primera fila = encabezados
     $data = [[
         'Empresa', 'Tipo', 'Base de datos', 'País', 'Departamento', 'Municipio',
-        'Sitio web', 'Gestor AAPOS', 'Activo', '# Contactos', 'Descripción'
+        'Sitio web', 'Gestor AAPOS', 'Activo', '# Contactos', 'Descripción','Proyectos'
     ]];
 
     foreach ($rows as $e) {
@@ -640,6 +646,7 @@ public function exportEmpresasExcel(Request $request)
             ($e->activo ? 'Sí' : 'No'),
             $e->contactos_count ?? 0,
             $e->descripcion,
+            $e->proyectos,
         ];
     }
 

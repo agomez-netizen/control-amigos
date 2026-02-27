@@ -14,72 +14,81 @@
     <h3 class="mb-0">Avances por fecha</h3>
 
     <div class="d-flex gap-2">
-      <a href="{{ route('avances.export', request()->all()) }}"
-        class="btn btn-success">
-            Exportar Excel
-        </a>
-        <a href="{{ route('avances.create') }}" class="btn btn-outline-primary">
+      <a href="{{ route('avances.export', request()->all()) }}" class="btn btn-success">
+        Exportar Excel
+      </a>
+      <a href="{{ route('avances.create') }}" class="btn btn-outline-primary">
         Registrar avance
       </a>
     </div>
   </div>
 
- <form class="card card-body mb-3" method="GET" action="{{ route('avances.byDate') }}">
-  <div class="row g-3 align-items-end">
+  <form class="card card-body mb-3" method="GET" action="{{ route('avances.byDate') }}">
+    <div class="row g-3 align-items-end">
 
-    {{-- Fila 1 --}}
-    <div class="col-md-6">
-      <label class="form-label">Punto de Venta</label>
-      <select id="empresaSelect" name="id_empresa" class="form-select">
-        <option value="" {{ empty($idEmpresa) ? 'selected' : '' }}>— Todos —</option>
-        @foreach($empresas as $e)
-          <option value="{{ $e->id_empresa }}"
-            {{ (string)$idEmpresa === (string)$e->id_empresa ? 'selected' : '' }}>
-            {{ $e->nombre }}
-          </option>
-        @endforeach
-      </select>
-      <div class="form-text">Escribe para buscar y selecciona una empresa.</div>
+      {{-- Fila 1 --}}
+      <div class="col-md-6">
+        <label class="form-label">Contacto</label>
+        <select id="contactoSelect" name="id_contacto" class="form-select">
+          <option value="" {{ empty($idContacto ?? request('id_contacto')) ? 'selected' : '' }}>— Todos —</option>
+
+          @foreach(($contactos ?? collect()) as $c)
+            @php
+              $nombreCompleto = trim(($c->contacto_nombre ?? $c->nombre ?? '') . ' ' . ($c->contacto_apellido ?? $c->apellido ?? ''));
+              $empresaNombre = $c->empresa_nombre ?? ($c->empresa->nombre ?? '');
+              $puesto = $c->puesto ?? '';
+              $label = trim($empresaNombre . ' — ' . $nombreCompleto);
+              if ($puesto) $label .= " ({$puesto})";
+            @endphp
+
+            <option value="{{ $c->id_contacto }}"
+              {{ (string)($idContacto ?? request('id_contacto')) === (string)$c->id_contacto ? 'selected' : '' }}>
+              {{ $label }}
+            </option>
+          @endforeach
+        </select>
+
+        <div class="form-text">Escribe para buscar y selecciona un contacto.</div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Usuario</label>
+        <select id="usuarioSelect" name="id_usuario" class="form-select">
+          <option value="">— Todos —</option>
+          @foreach(($usuarios ?? collect()) as $usuario)
+            <option value="{{ $usuario->id_usuario }}"
+              {{ (string)request('id_usuario') === (string)$usuario->id_usuario ? 'selected' : '' }}>
+              {{ $usuario->nombre }} {{ $usuario->apellido }}
+            </option>
+          @endforeach
+        </select>
+        <div class="form-text">Escribe para buscar y selecciona un usuario.</div>
+      </div>
+
+      {{-- Fila 2 --}}
+      <div class="col-md-4">
+        <label class="form-label">Desde</label>
+        <input class="form-control" type="date"
+               name="desde"
+               value="{{ request('desde', $desde ?? '') }}">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Hasta</label>
+        <input class="form-control" type="date"
+               name="hasta"
+               value="{{ request('hasta', $hasta ?? '') }}">
+      </div>
+
+      <div class="col-md-4 text-end">
+        <label class="form-label d-block invisible">Botón</label>
+        <button class="btn btn-primary w-100" type="submit">
+          Filtrar
+        </button>
+      </div>
+
     </div>
-
-    <div class="col-md-6">
-      <label class="form-label">Usuario</label>
-      <select id="usuarioSelect" name="id_usuario" class="form-select">
-        <option value="">— Todos —</option>
-        @foreach(($usuarios ?? collect()) as $usuario)
-          <option value="{{ $usuario->id_usuario }}"
-            {{ (string)request('id_usuario') === (string)$usuario->id_usuario ? 'selected' : '' }}>
-            {{ $usuario->nombre }} {{ $usuario->apellido }}
-          </option>
-        @endforeach
-      </select>
-      <div class="form-text">Escribe para buscar y selecciona un usuario.</div>
-    </div>
-
-    {{-- Fila 2 --}}
-    <div class="col-md-4">
-      <label class="form-label">Desde</label>
-      <input class="form-control" type="date"
-             name="desde"
-             value="{{ request('desde', $desde ?? '') }}">
-    </div>
-
-    <div class="col-md-4">
-      <label class="form-label">Hasta</label>
-      <input class="form-control" type="date"
-             name="hasta"
-             value="{{ request('hasta', $hasta ?? '') }}">
-    </div>
-
-    <div class="col-md-4 text-end">
-      <label class="form-label d-block invisible">Botón</label>
-      <button class="btn btn-primary w-100" type="submit">
-        Filtrar
-      </button>
-    </div>
-
-  </div>
-</form>
+  </form>
 
   @forelse($grouped as $fecha => $items)
     <div class="mb-2">
@@ -97,8 +106,24 @@
               {{ $a->empresa->nombre ?? '—' }}
             </div>
 
-            <div class="text-muted">
-              {!! nl2br(e($a->descripcion ?? '')) !!}
+            {{-- mostrar contacto si existe --}}
+            <div class="small text-muted">
+              <i class="bi bi-person-badge me-1"></i>
+              @php
+                $cn = trim(($a->contacto->nombre ?? '') . ' ' . ($a->contacto->apellido ?? ''));
+                $cp = $a->contacto->puesto ?? '';
+              @endphp
+
+              @if($cn)
+                {{ $cn }}@if($cp) — {{ $cp }}@endif
+              @else
+                —
+              @endif
+            </div>
+
+            {{-- ✅ descripción SIN HTML --}}
+            <div class="text-muted mt-1">
+              {!! nl2br(e(strip_tags($a->descripcion ?? ''))) !!}
             </div>
 
             <div class="small mt-2 text-muted">
@@ -150,9 +175,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   // Tom Select (si está disponible)
-  const empresaSel = document.getElementById('empresaSelect');
-  if (empresaSel && window.TomSelect) {
-    new TomSelect(empresaSel, {
+  const contactoSel = document.getElementById('contactoSelect');
+  if (contactoSel && window.TomSelect) {
+    new TomSelect(contactoSel, {
       create: false,
       allowEmptyOption: true,
       placeholder: '— Todos —',

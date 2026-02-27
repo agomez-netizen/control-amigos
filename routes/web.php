@@ -116,6 +116,11 @@ Route::post('/empresas/import', [EmpresaController::class, 'importExcel'])
     Route::post('/ventas', [VentaController::class, 'store'])->name('ventas.store');
 
 
+    Route::get('/usuarios/bases', [UsuarioEmpresaController::class, 'index'])->name('usuarios.bases');
+Route::get('/usuarios/{id}/bases', [UsuarioEmpresaController::class, 'edit'])->name('usuarios.bases.edit');
+Route::post('/usuarios/{id}/bases', [UsuarioEmpresaController::class, 'update'])->name('usuarios.bases.update');
+
+
         Route::get('/usuarios/empresas', [UsuarioEmpresaController::class, 'index'])
         ->name('usuarios.empresas');
 

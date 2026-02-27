@@ -11,6 +11,7 @@
         Tipo: <strong>{{ $empresa->tipoEmpresa->nombre ?? ($empresa->tipo_empresa->nombre ?? '—') }}</strong>
         · Base: <strong>{{ $empresa->baseDeDatos->nombre ?? ($empresa->base_de_datos->nombre ?? '—') }}</strong>
         · Activo: <strong>{{ ($empresa->activo ?? 0) ? 'Sí' : 'No' }}</strong>
+        · Proyectos: <strong>{{ ($empresa->proyectos ?? 0) ? 'Sí' : 'No' }}</strong>
       </div>
     </div>
 
@@ -114,7 +115,7 @@
               <th>Nombre</th>
               <th>Contacto</th>
               <th>Puesto</th>
-              <th>Dirección</th>
+              <th>Departamento</th>
               <th>Activo</th>
             </tr>
           </thead>
@@ -138,7 +139,7 @@
 
                 <td>{{ $c->puesto ?? '—' }}</td>
 
-                <td>{{ $c->direccion ?? '—' }}</td>
+                <td>{{ $c->departamento ?? '—' }}</td>
 
                 <td>
                   @if(($c->activo ?? 0) == 1)

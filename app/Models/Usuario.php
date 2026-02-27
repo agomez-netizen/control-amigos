@@ -16,7 +16,7 @@ class Usuario extends Authenticatable
 
     protected $hidden = ['pass'];
 
-  
+
     public function getAuthPassword()
     {
         return $this->pass;
@@ -35,6 +35,16 @@ class Usuario extends Authenticatable
             'id_usuario',
             'id_empresa'
         )->withTimestamps();
+    }
+
+    public function basesDeDatos()
+    {
+        return $this->belongsToMany(
+            \App\Models\BaseDeDatos::class,
+            'usuario_base_datos',
+            'id_usuario',
+            'id_base_datos'
+        );
     }
 
 }

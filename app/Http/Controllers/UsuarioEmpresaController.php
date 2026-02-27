@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Usuario;
-use App\Models\Empresa;
+use App\Models\BaseDeDatos;
 
 class UsuarioEmpresaController extends Controller
 {
@@ -18,25 +18,25 @@ class UsuarioEmpresaController extends Controller
                       ->orWhere('apellido', 'like', "%$q%")
                       ->orWhere('usuario', 'like', "%$q%");
             })
-            ->withCount('empresas')
+            ->withCount('basesDeDatos')
             ->orderBy('id_usuario', 'desc')
             ->paginate(10)
             ->appends(['q' => $q]);
 
-        return view('usuarios.empresas_index', compact('usuarios', 'q'));
+        return view('usuarios.bases_index', compact('usuarios', 'q'));
     }
 
     public function edit($id)
     {
-        $usuario = Usuario::with('empresas')->findOrFail($id);
+        $usuario = Usuario::with('basesDeDatos')->findOrFail($id);
 
-        $empresas = Empresa::query()
+        $bases = BaseDeDatos::query()
             ->orderBy('nombre')
-            ->get(['id_empresa', 'nombre', 'activo']);
+            ->get(['id_base_datos', 'nombre', 'descripcion']);
 
-        $asignadas = $usuario->empresas->pluck('id_empresa')->toArray();
+        $asignadas = $usuario->basesDeDatos->pluck('id_base_datos')->toArray();
 
-        return view('usuarios.empresas_edit', compact('usuario', 'empresas', 'asignadas'));
+        return view('usuarios.bases_edit', compact('usuario', 'bases', 'asignadas'));
     }
 
     public function update(Request $request, $id)
@@ -44,15 +44,14 @@ class UsuarioEmpresaController extends Controller
         $usuario = Usuario::findOrFail($id);
 
         $data = $request->validate([
-            'empresas'   => ['nullable','array'],
-            'empresas.*' => ['integer','exists:empresa,id_empresa'],
+            'bases'   => ['nullable','array'],
+            'bases.*' => ['integer','exists:base_de_datos,id_base_datos'],
         ]);
 
-        // sync = deja EXACTAMENTE esas empresas asignadas (agrega/quita)
-        $usuario->empresas()->sync($data['empresas'] ?? []);
+        $usuario->basesDeDatos()->sync($data['bases'] ?? []);
 
         return redirect()
-            ->route('usuarios.empresas.edit', $usuario->id_usuario)
-            ->with('ok', 'Empresas actualizadas ✅');
+            ->route('usuarios.bases.edit', $usuario->id_usuario)
+            ->with('ok', 'Bases de datos actualizadas ✅');
     }
 }

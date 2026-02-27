@@ -30,8 +30,9 @@ class Empresa extends Model
         'pais',
         'puesto',
         'sitio_web',
-        'id_tipo_empresa', 
+        'id_tipo_empresa',
         'titulo',
+        'proyectos',
     ];
 
 

@@ -11,6 +11,7 @@ class Avance extends Model
 
     protected $fillable = [
         'id_empresa',
+        'id_contacto',   // agrega esto
         'id_usuario',
         'descripcion',
         'fecha',
@@ -38,4 +39,10 @@ class Avance extends Model
             ->orderByDesc('created_at')
             ->orderByDesc('id_historial');
     }
+
+    public function contacto()
+    {
+        return $this->belongsTo(\App\Models\Contacto::class, 'id_contacto', 'id_contacto');
+    }
+
 }
