@@ -11,7 +11,12 @@ use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use App\Exports\ArrayExport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\EmpresasTemplateExport;
 use Carbon\Carbon;
+use App\Imports\EmpresasImport;
+
+
+
 
 class EmpresaController extends Controller
 {
@@ -47,6 +52,24 @@ class EmpresaController extends Controller
         if ($pais !== '') $empresasQuery->where('pais', 'like', "%{$pais}%");
         if ($depto !== '') $empresasQuery->where('departamento', 'like', "%{$depto}%");
         if ($muni !== '') $empresasQuery->where('municipio', 'like', "%{$muni}%");
+
+
+        // Filtro por Gestor AAPOS (texto parcial)
+        if ($request->filled('gestor_aapos')) {
+            $qGestor = trim($request->gestor_aapos);
+            $empresasQuery->where('gestor_aapos', 'like', "%{$qGestor}%");
+        }
+
+        // Filtro por Proyectos (0/1)
+        if ($request->filled('proyectos')) {
+            $empresasQuery->where('proyectos', (int) $request->proyectos);
+        }
+
+        $proyectos = $request->get('proyectos'); // '', '1', '0'
+        if ($proyectos === '0' || $proyectos === '1') {
+            $empresasQuery->where('proyectos', (int) $proyectos);
+        }
+
 
         if ($q !== '') {
             $empresasQuery->where(function ($w) use ($q) {
@@ -297,10 +320,30 @@ public function update(Request $request, $id)
     // =========================
     // IMPORT
     // =========================
-    public function importForm()
-    {
-        return view('empresas.import');
-    }
+
+
+        public function importForm()
+        {
+            return view('empresas.import');
+        }
+
+        public function importExcel(Request $request)
+        {
+            $request->validate([
+                'file' => ['required','file','mimes:xlsx,xls'],
+                'actualizar' => ['nullable','boolean'],
+            ]);
+
+            $actualizar = (bool) $request->boolean('actualizar', true);
+
+            Excel::import(new EmpresasImport($actualizar), $request->file('file'));
+
+            return redirect()
+                ->route('empresas.index')
+                ->with('success', 'Empresas importadas correctamente.');
+        }
+
+
 
     private function normHeader(string $h): string
     {
@@ -342,367 +385,205 @@ public function update(Request $request, $id)
         return $rows;
     }
 
-    public function importExcel(Request $request)
+
+
+
+    public function downloadTemplate()
     {
-        $request->validate([
-            'archivo' => ['required', 'file', 'mimes:xlsx'],
+        return Excel::download(new EmpresasTemplateExport(), 'plantilla_empresas.xlsx');
+    }
+
+    public function contactoStore(Request $request, $empresaId)
+    {
+        $empresa = Empresa::findOrFail($empresaId);
+
+        $data = $request->validate([
+            'nombre' => ['required','string','max:120'],
+            'apellido' => ['nullable','string','max:120'],
+            'telefono' => ['nullable','string','max:30'],
+            'celular' => ['nullable','string','max:30'],
+            'email' => ['nullable','string','max:190'],
+            'direccion' => ['nullable','string','max:255'],
+            'puesto' => ['nullable','string','max:120'],
+            'departamento' => ['nullable','string','max:120'],
+            'titulo' => ['nullable','string','max:120'],
+            'notas' => ['nullable','string'],
+            'activo' => ['nullable','boolean'],
         ]);
 
-        $filePath = $request->file('archivo')->getRealPath();
+        $data['activo'] = $request->boolean('activo');
 
-        $errors = [];
-        $createdEmpresas = 0;
-        $createdContactos = 0;
+        $empresa->contactos()->create($data);
 
-        try {
-            $spreadsheet = IOFactory::load($filePath);
+        return back()->with('success', 'Contacto agregado.');
+    }
 
-            $wsEmp = $spreadsheet->getSheetByName('Empresas');
-            $wsCon = $spreadsheet->getSheetByName('Contactos');
+    public function contactoUpdate(Request $request, $empresaId, $contactoId)
+    {
+        $empresa = Empresa::findOrFail($empresaId);
 
-            // Compat: si vienen hojas viejas
-            $wsTel = $spreadsheet->getSheetByName('Telefonos');
-            $wsCel = $spreadsheet->getSheetByName('Celulares');
+        // Seguridad: el contacto debe pertenecer a la empresa
+        $contacto = $empresa->contactos()->where('id_contacto', $contactoId)->firstOrFail();
 
-            if (!$wsEmp) {
-                return back()->with('errors_import', ["No existe la hoja 'Empresas'."]);
-            }
+        $data = $request->validate([
+            'nombre' => ['required','string','max:120'],
+            'apellido' => ['nullable','string','max:120'],
+            'telefono' => ['nullable','string','max:30'],
+            'celular' => ['nullable','string','max:30'],
+            'email' => ['nullable','string','max:190'],
+            'direccion' => ['nullable','string','max:255'],
+            'puesto' => ['nullable','string','max:120'],
+            'departamento' => ['nullable','string','max:120'],
+            'titulo' => ['nullable','string','max:120'],
+            'notas' => ['nullable','string'],
+            'activo' => ['nullable','boolean'],
+        ]);
 
-            $empRows = $this->sheetToRows($wsEmp);
-            $conRows = $wsCon ? $this->sheetToRows($wsCon) : [];
+        $data['activo'] = $request->boolean('activo');
 
-            DB::transaction(function () use (&$errors, &$createdEmpresas, &$createdContactos, $empRows, $conRows, $wsTel, $wsCel) {
+        $contacto->update($data);
 
-                // 1) Importar empresas
-                foreach ($empRows as $row) {
-                    $nombre = trim((string)($row['nombre'] ?? $row['empresa'] ?? ''));
-                    if ($nombre === '') {
-                        $errors[] = "Fila de Empresas sin nombre.";
-                        continue;
-                    }
+            return redirect()
+            ->route('empresas.edit', $empresaId)   // 👈 sin edit_contacto
+            ->with('success', 'Contacto actualizado.')
+            ->withFragment('contactos');          // 👈 te manda a #contactos
+    }
 
-                    $baseNombre = trim((string)($row['base_de_datos'] ?? $row['base'] ?? $row['nombre_base_datos'] ?? ''));
-                    if ($baseNombre === '') $baseNombre = 'DB_PRINCIPAL';
+    public function contactoDestroy($empresaId, $contactoId)
+    {
+        $empresa = Empresa::findOrFail($empresaId);
 
-                    $base = BaseDeDatos::firstOrCreate(
-                        ['nombre' => $baseNombre],
-                        ['descripcion' => null]
-                    );
+        $contacto = $empresa->contactos()->where('id_contacto', $contactoId)->firstOrFail();
+        $contacto->delete();
 
-                    $tipoNombre = trim((string)($row['tipo_empresa'] ?? $row['tipo'] ?? ''));
-                    $tipo = null;
-                    if ($tipoNombre !== '') {
-                        $tipo = TipoEmpresa::firstOrCreate(
-                            ['nombre' => $tipoNombre],
-                            ['descripcion' => null, 'activo' => 1]
-                        );
-                    }
+        return back()->with('success', 'Contacto eliminado.');
+    }
 
-                    $payload = [
-                        'nombre' => $nombre,
-                        'descripcion' => $row['descripcion'] ?? null,
-                        'activo' => isset($row['activo']) ? (int) !!$row['activo'] : 1,
-                        'pais' => $row['pais'] ?? 'Guatemala',
-                        'departamento' => $row['departamento'] ?? null,
-                        'municipio' => $row['municipio'] ?? null,
-                        'sitio_web' => $row['sitio_web'] ?? $row['web'] ?? null,
-                        'detalles' => $row['detalles'] ?? null,
-                        'notas' => $row['notas'] ?? null,
-                        'gestor_aapos' => $row['gestor_aapos'] ?? null,
-                        'id_base_datos' => (int)$base->id_base_datos,
-                        'id_tipo_empresa' => $tipo ? (int)$tipo->id_tipo_empresa : null,
-                        'proyectos'=> isset($row['proyectos']) ? (int) !!$row['proyectos'] : 1,
-                    ];
 
-                    $empresa = Empresa::firstOrCreate(['nombre' => $nombre], $payload);
-                    if ($empresa->wasRecentlyCreated) {
-                        $createdEmpresas++;
-                    } else {
-                        // si ya existe, actualizamos campos clave
-                        $empresa->update($payload);
-                    }
-                }
+    public function exportEmpresasExcel(Request $request)
+    {
+        // Estos nombres deben coincidir con tus filtros del index
+        $q      = trim((string) $request->get('q', ''));
+        $idBase = $request->get('id_base_datos');
+        $idTipo = $request->get('id_tipo_empresa');
+        $activo = $request->get('activo'); // '', '1', '0'
+        $pais   = trim((string) $request->get('pais', ''));
+        $depto  = trim((string) $request->get('departamento', ''));
+        $muni   = trim((string) $request->get('municipio', ''));
+        $proyeectos   = trim((string) $request->get('proyectos', ''));
 
-                // 2) Importar contactos (si viene hoja nueva)
-                if (!empty($conRows)) {
-                    foreach ($conRows as $row) {
-                        $empresaNombre = trim((string)($row['empresa'] ?? $row['nombre_empresa'] ?? ''));
-                        $empresa = $empresaNombre !== '' ? Empresa::where('nombre', $empresaNombre)->first() : null;
-                        if (!$empresa) {
-                            $errors[] = "Contacto sin empresa válida: '{$empresaNombre}'.";
-                            continue;
-                        }
+        $query = Empresa::query()
+            ->with(['baseDeDatos', 'tipoEmpresa'])   // ajusta nombres si difieren
+            ->withCount('contactos')
+            ->orderBy('nombre');
 
-                        $nombre = trim((string)($row['nombre'] ?? ''));
-                        $apellido = trim((string)($row['apellido'] ?? ''));
-                        $email = trim((string)($row['email'] ?? ''));
-
-                        if ($nombre === '' && $apellido === '' && $email === '') {
-                            continue;
-                        }
-
-                        $empresa->contactos()->create([
-                            'nombre' => $nombre !== '' ? $nombre : 'Contacto',
-                            'apellido' => $apellido !== '' ? $apellido : null,
-                            'telefono' => trim((string)($row['telefono'] ?? '')) ?: null,
-                            'celular'  => trim((string)($row['celular'] ?? '')) ?: null,
-                            'email'    => $email !== '' ? $email : null,
-                            'direccion'=> trim((string)($row['direccion'] ?? '')) ?: null,
-                            'puesto'   => trim((string)($row['puesto'] ?? '')) ?: null,
-                            'departamento' => trim((string)($row['departamento'] ?? '')) ?: null,
-                            'titulo'   => trim((string)($row['titulo'] ?? '')) ?: null,
-                            'notas'    => trim((string)($row['notas'] ?? '')) ?: null,
-                            'activo'   => isset($row['activo']) ? (int) !!$row['activo'] : 1,
-                        ]);
-
-                        $createdContactos++;
-                    }
-                }
-
-                // 3) Compat: hojas viejas Telefonos/Celulares (si existen)
-                //    -> crea un contacto "Contacto" y le mete telefono/celular
-                if ($wsTel) {
-                    $telRows = $this->sheetToRows($wsTel);
-                    foreach ($telRows as $row) {
-                        $empresaId = $row['id_empresa'] ?? null;
-                        $telefono = trim((string)($row['telefono'] ?? ''));
-                        if (!$empresaId || $telefono === '') continue;
-
-                        $empresa = Empresa::find($empresaId);
-                        if (!$empresa) continue;
-
-                        $empresa->contactos()->create([
-                            'nombre' => 'Contacto',
-                            'telefono' => $telefono,
-                            'notas' => $row['nota'] ?? 'Importado (Telefonos)',
-                            'activo' => 1,
-                        ]);
-                        $createdContactos++;
-                    }
-                }
-
-                if ($wsCel) {
-                    $celRows = $this->sheetToRows($wsCel);
-                    foreach ($celRows as $row) {
-                        $empresaId = $row['id_empresa'] ?? null;
-                        $celular = trim((string)($row['celular'] ?? ''));
-                        if (!$empresaId || $celular === '') continue;
-
-                        $empresa = Empresa::find($empresaId);
-                        if (!$empresa) continue;
-
-                        $empresa->contactos()->create([
-                            'nombre' => 'Contacto',
-                            'celular' => $celular,
-                            'notas' => $row['nota'] ?? 'Importado (Celulares)',
-                            'activo' => 1,
-                        ]);
-                        $createdContactos++;
-                    }
-                }
+        if ($q !== '') {
+            $query->where(function ($w) use ($q) {
+                $w->where('nombre', 'like', "%{$q}%")
+                ->orWhere('descripcion', 'like', "%{$q}%")
+                ->orWhere('sitio_web', 'like', "%{$q}%")
+                ->orWhereHas('contactos', function($c) use ($q) {
+                    $c->where('nombre', 'like', "%{$q}%")
+                        ->orWhere('apellido', 'like', "%{$q}%")
+                        ->orWhere('email', 'like', "%{$q}%")
+                        ->orWhere('telefono', 'like', "%{$q}%")
+                        ->orWhere('celular', 'like', "%{$q}%")
+                        ->orWhere('puesto', 'like', "%{$q}%");
+                });
             });
-
-        } catch (\Throwable $e) {
-            return back()->with('errors_import', ["Error leyendo el archivo: " . $e->getMessage()]);
         }
 
-        $msg = "Importación lista. Empresas: {$createdEmpresas}. Contactos: {$createdContactos}.";
-        return redirect()->route('empresas.index')
-            ->with('success', $msg)
-            ->with('errors_import', $errors);
+        if ($idBase) $query->where('id_base_datos', $idBase);
+        if ($idTipo) $query->where('id_tipo_empresa', $idTipo);
+
+        if ($activo === '0' || $activo === '1') {
+            $query->where('activo', (int) $activo);
+        }
+
+        if ($pais !== '')  $query->where('pais', 'like', "%{$pais}%");
+        if ($depto !== '') $query->where('departamento', 'like', "%{$depto}%");
+        if ($muni !== '')  $query->where('municipio', 'like', "%{$muni}%");
+
+        $rows = $query->get();
+
+        // Primera fila = encabezados
+        $data = [[
+            'Empresa', 'Tipo', 'Base de datos', 'País', 'Departamento', 'Municipio',
+            'Sitio web', 'Gestor AAPOS', 'Activo', '# Contactos', 'Descripción','Proyectos'
+        ]];
+
+        foreach ($rows as $e) {
+            $data[] = [
+
+                $e->nombre,
+                $e->tipoEmpresa->nombre ?? ($e->tipo_empresa->nombre ?? ''),
+                $e->baseDeDatos->nombre ?? ($e->base_de_datos->nombre ?? ''),
+                $e->pais,
+                $e->departamento,
+                $e->municipio,
+                $e->sitio_web,
+                $e->gestor_aapos,
+                ($e->activo ? 'Sí' : 'No'),
+                $e->contactos_count ?? 0,
+                $e->descripcion,
+                $e->proyectos,
+            ];
+        }
+
+        $filename = 'empresas_' . Carbon::now()->format('Ymd_His') . '.xlsx';
+        return Excel::download(new ArrayExport($data), $filename);
     }
 
+    public function exportContactosExcel(Request $request, $empresaId)
+    {
+        $empresa = Empresa::findOrFail($empresaId);
 
-public function contactoStore(Request $request, $empresaId)
-{
-    $empresa = Empresa::findOrFail($empresaId);
+        $cq = trim((string) $request->get('cq', ''));
 
-    $data = $request->validate([
-        'nombre' => ['required','string','max:120'],
-        'apellido' => ['nullable','string','max:120'],
-        'telefono' => ['nullable','string','max:30'],
-        'celular' => ['nullable','string','max:30'],
-        'email' => ['nullable','string','max:190'],
-        'direccion' => ['nullable','string','max:255'],
-        'puesto' => ['nullable','string','max:120'],
-        'departamento' => ['nullable','string','max:120'],
-        'titulo' => ['nullable','string','max:120'],
-        'notas' => ['nullable','string'],
-        'activo' => ['nullable','boolean'],
-    ]);
+        $query = $empresa->contactos()->orderBy('apellido')->orderBy('nombre');
 
-    $data['activo'] = $request->boolean('activo');
+        if ($cq !== '') {
+            $query->where(function($w) use ($cq) {
+                $w->where('nombre', 'like', "%{$cq}%")
+                ->orWhere('apellido', 'like', "%{$cq}%")
+                ->orWhere('email', 'like', "%{$cq}%")
+                ->orWhere('telefono', 'like', "%{$cq}%")
+                ->orWhere('celular', 'like', "%{$cq}%")
+                ->orWhere('puesto', 'like', "%{$cq}%")
+                ->orWhere('departamento', 'like', "%{$cq}%")
+                ->orWhere('titulo', 'like', "%{$cq}%");
+            });
+        }
 
-    $empresa->contactos()->create($data);
+        $rows = $query->get();
 
-    return back()->with('success', 'Contacto agregado.');
-}
+        $data = [[
+            'Nombre', 'Apellido', 'Título', 'Puesto',
+            'Email', 'Teléfono', 'Celular', 'Departamento', 'Dirección', 'Notas', 'Activo'
+        ]];
 
-public function contactoUpdate(Request $request, $empresaId, $contactoId)
-{
-    $empresa = Empresa::findOrFail($empresaId);
+        foreach ($rows as $c) {
+            $data[] = [
 
-    // Seguridad: el contacto debe pertenecer a la empresa
-    $contacto = $empresa->contactos()->where('id_contacto', $contactoId)->firstOrFail();
+                $c->nombre,
+                $c->apellido,
+                $c->titulo,
+                $c->puesto,
+                $c->email,
+                $c->telefono,
+                $c->celular,
+                $c->departamento,
+                $c->direccion,
+                $c->notas,
+                ($c->activo ? 'Sí' : 'No'),
+            ];
+        }
 
-    $data = $request->validate([
-        'nombre' => ['required','string','max:120'],
-        'apellido' => ['nullable','string','max:120'],
-        'telefono' => ['nullable','string','max:30'],
-        'celular' => ['nullable','string','max:30'],
-        'email' => ['nullable','string','max:190'],
-        'direccion' => ['nullable','string','max:255'],
-        'puesto' => ['nullable','string','max:120'],
-        'departamento' => ['nullable','string','max:120'],
-        'titulo' => ['nullable','string','max:120'],
-        'notas' => ['nullable','string'],
-        'activo' => ['nullable','boolean'],
-    ]);
+        $safeName = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $empresa->nombre ?? 'empresa');
+        $filename = "contactos_{$safeName}_" . Carbon::now()->format('Ymd_His') . ".xlsx";
 
-    $data['activo'] = $request->boolean('activo');
-
-    $contacto->update($data);
-
-        return redirect()
-        ->route('empresas.edit', $empresaId)   // 👈 sin edit_contacto
-        ->with('success', 'Contacto actualizado.')
-        ->withFragment('contactos');          // 👈 te manda a #contactos
-}
-
-public function contactoDestroy($empresaId, $contactoId)
-{
-    $empresa = Empresa::findOrFail($empresaId);
-
-    $contacto = $empresa->contactos()->where('id_contacto', $contactoId)->firstOrFail();
-    $contacto->delete();
-
-    return back()->with('success', 'Contacto eliminado.');
-}
-
-
-public function exportEmpresasExcel(Request $request)
-{
-    // Estos nombres deben coincidir con tus filtros del index
-    $q      = trim((string) $request->get('q', ''));
-    $idBase = $request->get('id_base_datos');
-    $idTipo = $request->get('id_tipo_empresa');
-    $activo = $request->get('activo'); // '', '1', '0'
-    $pais   = trim((string) $request->get('pais', ''));
-    $depto  = trim((string) $request->get('departamento', ''));
-    $muni   = trim((string) $request->get('municipio', ''));
-    $proyeectos   = trim((string) $request->get('proyectos', ''));
-
-    $query = Empresa::query()
-        ->with(['baseDeDatos', 'tipoEmpresa'])   // ajusta nombres si difieren
-        ->withCount('contactos')
-        ->orderBy('nombre');
-
-    if ($q !== '') {
-        $query->where(function ($w) use ($q) {
-            $w->where('nombre', 'like', "%{$q}%")
-              ->orWhere('descripcion', 'like', "%{$q}%")
-              ->orWhere('sitio_web', 'like', "%{$q}%")
-              ->orWhereHas('contactos', function($c) use ($q) {
-                  $c->where('nombre', 'like', "%{$q}%")
-                    ->orWhere('apellido', 'like', "%{$q}%")
-                    ->orWhere('email', 'like', "%{$q}%")
-                    ->orWhere('telefono', 'like', "%{$q}%")
-                    ->orWhere('celular', 'like', "%{$q}%")
-                    ->orWhere('puesto', 'like', "%{$q}%");
-              });
-        });
+        return Excel::download(new ArrayExport($data), $filename);
     }
 
-    if ($idBase) $query->where('id_base_datos', $idBase);
-    if ($idTipo) $query->where('id_tipo_empresa', $idTipo);
-
-    if ($activo === '0' || $activo === '1') {
-        $query->where('activo', (int) $activo);
-    }
-
-    if ($pais !== '')  $query->where('pais', 'like', "%{$pais}%");
-    if ($depto !== '') $query->where('departamento', 'like', "%{$depto}%");
-    if ($muni !== '')  $query->where('municipio', 'like', "%{$muni}%");
-
-    $rows = $query->get();
-
-    // Primera fila = encabezados
-    $data = [[
-        'Empresa', 'Tipo', 'Base de datos', 'País', 'Departamento', 'Municipio',
-        'Sitio web', 'Gestor AAPOS', 'Activo', '# Contactos', 'Descripción','Proyectos'
-    ]];
-
-    foreach ($rows as $e) {
-        $data[] = [
-
-            $e->nombre,
-            $e->tipoEmpresa->nombre ?? ($e->tipo_empresa->nombre ?? ''),
-            $e->baseDeDatos->nombre ?? ($e->base_de_datos->nombre ?? ''),
-            $e->pais,
-            $e->departamento,
-            $e->municipio,
-            $e->sitio_web,
-            $e->gestor_aapos,
-            ($e->activo ? 'Sí' : 'No'),
-            $e->contactos_count ?? 0,
-            $e->descripcion,
-            $e->proyectos,
-        ];
-    }
-
-    $filename = 'empresas_' . Carbon::now()->format('Ymd_His') . '.xlsx';
-    return Excel::download(new ArrayExport($data), $filename);
 }
 
-public function exportContactosExcel(Request $request, $empresaId)
-{
-    $empresa = Empresa::findOrFail($empresaId);
-
-    $cq = trim((string) $request->get('cq', ''));
-
-    $query = $empresa->contactos()->orderBy('apellido')->orderBy('nombre');
-
-    if ($cq !== '') {
-        $query->where(function($w) use ($cq) {
-            $w->where('nombre', 'like', "%{$cq}%")
-              ->orWhere('apellido', 'like', "%{$cq}%")
-              ->orWhere('email', 'like', "%{$cq}%")
-              ->orWhere('telefono', 'like', "%{$cq}%")
-              ->orWhere('celular', 'like', "%{$cq}%")
-              ->orWhere('puesto', 'like', "%{$cq}%")
-              ->orWhere('departamento', 'like', "%{$cq}%")
-              ->orWhere('titulo', 'like', "%{$cq}%");
-        });
-    }
-
-    $rows = $query->get();
-
-    $data = [[
-         'Nombre', 'Apellido', 'Título', 'Puesto',
-        'Email', 'Teléfono', 'Celular', 'Departamento', 'Dirección', 'Notas', 'Activo'
-    ]];
-
-    foreach ($rows as $c) {
-        $data[] = [
-
-            $c->nombre,
-            $c->apellido,
-            $c->titulo,
-            $c->puesto,
-            $c->email,
-            $c->telefono,
-            $c->celular,
-            $c->departamento,
-            $c->direccion,
-            $c->notas,
-            ($c->activo ? 'Sí' : 'No'),
-        ];
-    }
-
-    $safeName = preg_replace('/[^a-zA-Z0-9_-]+/', '_', $empresa->nombre ?? 'empresa');
-    $filename = "contactos_{$safeName}_" . Carbon::now()->format('Ymd_His') . ".xlsx";
-
-    return Excel::download(new ArrayExport($data), $filename);
-}
-
-}

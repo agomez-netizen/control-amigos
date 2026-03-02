@@ -91,6 +91,22 @@
         </select>
       </div>
 
+      <div class="col-md-3">
+        <label class="form-label">Gestor AAPOS</label>
+        <input type="text" name="gestor_aapos" class="form-control"
+               value="{{ request('gestor_aapos') }}"
+               placeholder="Nombre del gestor...">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label">Proyectos</label>
+        <select name="proyectos" class="form-select">
+          <option value="">-- Todos --</option>
+          <option value="1" @selected(request('proyectos') === '1')>Sí</option>
+          <option value="0" @selected(request('proyectos') === '0')>No</option>
+        </select>
+      </div>
+
       <div class="col-md-12 d-flex gap-2">
         <button class="btn btn-primary">Filtrar</button>
         <a href="{{ route('empresas.index') }}" class="btn btn-outline-secondary">Limpiar</a>
@@ -106,7 +122,7 @@
           <th>Empresa</th>
           <th>Tipo</th>
           <th>Base</th>
-          <th>Ubicación</th>
+          <th>Gestor AAPOS</th>
           <th class="text-center">Contactos</th>
           <th class="text-center">Activo</th>
           <th class="text-end">Acciones</th>
@@ -131,13 +147,8 @@
             <td>{{ $e->tipoEmpresa->nombre ?? '—' }}</td>
             <td>{{ $e->baseDeDatos->nombre ?? '—' }}</td>
 
-            <td>
-              <div>{{ $e->pais ?: '—' }}</div>
-              <div class="text-muted small">
-                {{ $e->departamento ?: '' }}
-                {{ $e->municipio ? ' / '.$e->municipio : '' }}
-              </div>
-            </td>
+            <td>{{ $e->gestor_aapos ?? '—' }}</td>
+
 
             <td class="text-center">
               {{ $e->contactos_count ?? 0 }}

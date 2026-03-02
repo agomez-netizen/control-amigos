@@ -49,6 +49,18 @@ Route::post('/logout', [AuthController::class, 'logout'])
 */
 Route::middleware(['auth.custom', 'nocache'])->group(function () {
 
+
+    // Import
+    Route::get('/empresas/importar', [EmpresaController::class, 'importForm'])->name('empresas.import.form');
+    Route::post('/empresas/importar', [EmpresaController::class, 'importExcel'])->name('empresas.import.excel');
+
+    // Plantilla (ANTES del resource para que no lo atrape /empresas/{empresa})
+    Route::get('/empresas/plantilla', [EmpresaController::class, 'downloadTemplate'])
+        ->name('empresas.template');
+
+
+
+
     // =========================
     // DASHBOARD
     // =========================
@@ -92,7 +104,7 @@ Route::middleware(['auth.custom', 'nocache'])->group(function () {
         Route::get('/empresas/import', [EmpresaController::class, 'importForm'])
     ->name('empresas.importForm');
 
-Route::post('/empresas/import', [EmpresaController::class, 'importExcel'])
+    Route::post('/empresas/import', [EmpresaController::class, 'importExcel'])
     ->name('empresas.importExcel');
     // CRUD completo
     Route::resource('empresas', EmpresaController::class);
@@ -117,8 +129,8 @@ Route::post('/empresas/import', [EmpresaController::class, 'importExcel'])
 
 
     Route::get('/usuarios/bases', [UsuarioEmpresaController::class, 'index'])->name('usuarios.bases');
-Route::get('/usuarios/{id}/bases', [UsuarioEmpresaController::class, 'edit'])->name('usuarios.bases.edit');
-Route::post('/usuarios/{id}/bases', [UsuarioEmpresaController::class, 'update'])->name('usuarios.bases.update');
+    Route::get('/usuarios/{id}/bases', [UsuarioEmpresaController::class, 'edit'])->name('usuarios.bases.edit');
+    Route::post('/usuarios/{id}/bases', [UsuarioEmpresaController::class, 'update'])->name('usuarios.bases.update');
 
 
         Route::get('/usuarios/empresas', [UsuarioEmpresaController::class, 'index'])
@@ -129,6 +141,8 @@ Route::post('/usuarios/{id}/bases', [UsuarioEmpresaController::class, 'update'])
 
     Route::post('/usuarios/{id}/empresas', [UsuarioEmpresaController::class, 'update'])
         ->name('usuarios.empresas.update');
+
+
 
 
 
